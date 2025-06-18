@@ -1,0 +1,29 @@
+# Python files
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.pkl
+*.egg-info/
+*.egg
+*.dist-info/
+.venv/
+venv/
+
+# PyVis auto-generated files
+lib/
+*.html
+
+# IDE/Editor files
+.vscode/
+.idea/
+*.DS_Store
+
+# Logs and databases
+*.log
+*.db
+*.sqlite3
+
+# Coverage and testing
+*.coverage
+.ipynb_checkpoints/
