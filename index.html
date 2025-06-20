@@ -1,0 +1,898 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Claude Memory Visualizer - Private & Secure</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.8.5/d3.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #f5f5f5;
+            overflow: hidden;
+        }
+        
+        #welcome {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 2000;
+            transition: opacity 0.5s ease-out;
+        }
+        
+        #welcome.hidden {
+            opacity: 0;
+            pointer-events: none;
+        }
+        
+        .welcome-content {
+            text-align: center;
+            max-width: 600px;
+            padding: 40px;
+        }
+        
+        .welcome-content h1 {
+            font-size: 3em;
+            margin-bottom: 20px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.2);
+        }
+        
+        .welcome-content p {
+            font-size: 1.2em;
+            margin-bottom: 30px;
+            opacity: 0.95;
+        }
+        
+        .privacy-badge {
+            background: rgba(255,255,255,0.2);
+            border: 2px solid white;
+            border-radius: 30px;
+            padding: 15px 30px;
+            display: inline-block;
+            margin-bottom: 40px;
+            font-weight: bold;
+        }
+        
+        .privacy-badge .icon {
+            font-size: 1.5em;
+            vertical-align: middle;
+            margin-right: 10px;
+        }
+        
+        .action-buttons {
+            display: flex;
+            gap: 20px;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+        
+        .btn {
+            background: white;
+            color: #667eea;
+            border: none;
+            padding: 15px 30px;
+            font-size: 1.1em;
+            border-radius: 30px;
+            cursor: pointer;
+            font-weight: bold;
+            transition: transform 0.2s, box-shadow 0.2s;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+        }
+        
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(0,0,0,0.3);
+        }
+        
+        .btn-secondary {
+            background: transparent;
+            color: white;
+            border: 2px solid white;
+        }
+        
+        #file-input {
+            display: none;
+        }
+        
+        #main-app {
+            display: none;
+            height: 100vh;
+            position: relative;
+        }
+        
+        #controls {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            z-index: 1000;
+            max-width: 300px;
+        }
+        
+        #controls h3 {
+            margin-bottom: 15px;
+            color: #333;
+        }
+        
+        #search {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            margin-bottom: 15px;
+            font-size: 14px;
+        }
+        
+        .control-buttons {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 15px;
+        }
+        
+        .control-btn {
+            flex: 1;
+            padding: 8px;
+            border: 1px solid #ddd;
+            background: white;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 13px;
+            transition: background 0.2s;
+        }
+        
+        .control-btn:hover {
+            background: #f0f0f0;
+        }
+        
+        #stats {
+            font-size: 14px;
+            color: #666;
+            margin-bottom: 15px;
+        }
+        
+        .privacy-notice {
+            background: #e8f5e9;
+            border: 1px solid #4caf50;
+            border-radius: 5px;
+            padding: 10px;
+            font-size: 12px;
+            color: #2e7d32;
+            margin-bottom: 15px;
+        }
+        
+        .privacy-notice .icon {
+            color: #4caf50;
+            margin-right: 5px;
+        }
+        
+        .upload-area {
+            border: 2px dashed #ddd;
+            border-radius: 5px;
+            padding: 20px;
+            text-align: center;
+            cursor: pointer;
+            transition: border-color 0.3s, background 0.3s;
+        }
+        
+        .upload-area:hover {
+            border-color: #667eea;
+            background: #f8f9ff;
+        }
+        
+        .upload-area.dragover {
+            border-color: #667eea;
+            background: #f8f9ff;
+        }
+        
+        #legend {
+            position: absolute;
+            bottom: 20px;
+            left: 20px;
+            background: white;
+            padding: 15px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            max-height: 300px;
+            overflow-y: auto;
+        }
+        
+        .legend-item {
+            display: flex;
+            align-items: center;
+            margin-bottom: 8px;
+            font-size: 13px;
+        }
+        
+        .legend-color {
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            margin-right: 10px;
+            border: 2px solid white;
+            box-shadow: 0 0 3px rgba(0,0,0,0.3);
+        }
+        
+        #details {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            width: 400px;
+            max-height: 90vh;
+            background: white;
+            padding: 25px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            overflow-y: auto;
+            display: none;
+            z-index: 1000;
+        }
+        
+        #details h2 {
+            margin-top: 0;
+            color: #333;
+            border-bottom: 2px solid #667eea;
+            padding-bottom: 10px;
+        }
+        
+        .close {
+            float: right;
+            cursor: pointer;
+            font-size: 28px;
+            color: #999;
+            line-height: 20px;
+        }
+        
+        .close:hover {
+            color: #333;
+        }
+        
+        .observation {
+            background: #f8f9fa;
+            padding: 10px 15px;
+            margin-bottom: 8px;
+            border-radius: 5px;
+            font-size: 14px;
+            line-height: 1.5;
+            border-left: 3px solid #667eea;
+        }
+        
+        .relation {
+            background: #e3f2fd;
+            padding: 10px 15px;
+            margin-bottom: 8px;
+            border-radius: 5px;
+            font-size: 14px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .relation-arrow {
+            color: #667eea;
+            font-weight: bold;
+        }
+        
+        svg {
+            width: 100%;
+            height: 100vh;
+            cursor: move;
+        }
+        
+        .node {
+            stroke: white;
+            stroke-width: 3px;
+            cursor: pointer;
+            transition: r 0.3s;
+        }
+        
+        .node:hover {
+            stroke: #333;
+            stroke-width: 4px;
+        }
+        
+        .node.highlighted {
+            stroke: #ff4444;
+            stroke-width: 5px;
+        }
+        
+        .link {
+            stroke: #999;
+            stroke-opacity: 0.6;
+            stroke-width: 2px;
+            fill: none;
+        }
+        
+        .link.highlighted {
+            stroke: #ff4444;
+            stroke-opacity: 1;
+            stroke-width: 4px;
+        }
+        
+        .node-label {
+            font: 13px sans-serif;
+            pointer-events: none;
+            text-anchor: middle;
+            user-select: none;
+            fill: #333;
+            text-shadow: 0 0 3px white, 0 0 3px white, 0 0 3px white;
+        }
+        
+        .dimmed {
+            opacity: 0.2 !important;
+        }
+        
+        #instructions {
+            position: absolute;
+            bottom: 20px;
+            right: 20px;
+            background: white;
+            padding: 15px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            font-size: 13px;
+            color: #666;
+            max-width: 300px;
+        }
+        
+        #instructions h4 {
+            margin-bottom: 10px;
+            color: #333;
+        }
+        
+        #instructions ul {
+            margin-left: 20px;
+        }
+        
+        #instructions li {
+            margin-bottom: 5px;
+        }
+        
+        .error-message {
+            background: #ffebee;
+            border: 1px solid #f44336;
+            color: #c62828;
+            padding: 15px;
+            border-radius: 5px;
+            margin-bottom: 15px;
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <!-- Welcome Screen -->
+    <div id="welcome">
+        <div class="welcome-content">
+            <h1>Claude Memory Visualizer</h1>
+            <p>Explore your AI assistant's knowledge graph in a beautiful, interactive visualization</p>
+            
+            <div class="privacy-badge">
+                <span class="icon">🔒</span>
+                100% Private - Your Data Never Leaves Your Browser
+            </div>
+            
+            <div class="action-buttons">
+                <button class="btn" onclick="loadDemoData()">
+                    Explore Demo Data
+                </button>
+                <label for="file-input" class="btn btn-secondary">
+                    Upload Your Memory
+                </label>
+                <input type="file" id="file-input" accept=".json,.jsonl" onchange="handleFileUpload(event)">
+            </div>
+            
+            <p style="margin-top: 40px; font-size: 0.9em; opacity: 0.8;">
+                To find your memory file: Look for <code>memory.json</code> in your Claude Desktop config folder
+            </p>
+        </div>
+    </div>
+    
+    <!-- Main Application -->
+    <div id="main-app">
+        <div id="controls">
+            <h3>🧠 Memory Explorer</h3>
+            
+            <div class="privacy-notice">
+                <span class="icon">🔐</span>
+                <strong>Your Privacy Guaranteed</strong><br>
+                All processing happens locally. No data is sent to any server.
+            </div>
+            
+            <input type="text" id="search" placeholder="Search entities..." />
+            
+            <div class="control-buttons">
+                <button class="control-btn" onclick="resetView()">Reset View</button>
+                <button class="control-btn" onclick="zoomIn()">Zoom In</button>
+                <button class="control-btn" onclick="zoomOut()">Zoom Out</button>
+            </div>
+            
+            <div id="stats">
+                <div>Entities: <strong id="node-count">0</strong></div>
+                <div>Relations: <strong id="link-count">0</strong></div>
+            </div>
+            
+            <div id="error-message" class="error-message"></div>
+            
+            <div class="upload-area" onclick="document.getElementById('file-input').click()" 
+                 ondrop="handleDrop(event)" ondragover="handleDragOver(event)" ondragleave="handleDragLeave(event)">
+                <div style="font-size: 2em; margin-bottom: 10px;">📁</div>
+                <div style="font-weight: bold; margin-bottom: 5px;">Upload New Memory</div>
+                <div style="font-size: 12px; color: #666;">Click or drag & drop your memory.json</div>
+            </div>
+        </div>
+        
+        <div id="legend">
+            <strong>Entity Types</strong>
+            <div id="legend-items" style="margin-top: 10px;"></div>
+        </div>
+        
+        <div id="details">
+            <span class="close" onclick="closeDetails()">×</span>
+            <h2 id="entity-name"></h2>
+            <div id="entity-type" style="color: #666; margin-bottom: 20px; font-weight: bold;"></div>
+            <h3 style="margin-bottom: 10px;">Observations (<span id="obs-count">0</span>)</h3>
+            <div id="observations"></div>
+            <h3 style="margin: 20px 0 10px;">Relations</h3>
+            <div id="relations"></div>
+        </div>
+        
+        <div id="instructions">
+            <h4>How to Navigate</h4>
+            <ul>
+                <li>🖱️ Click nodes to see details</li>
+                <li>🔍 Search to find entities</li>
+                <li>✋ Drag nodes to reorganize</li>
+                <li>🔄 Scroll to zoom in/out</li>
+                <li>🎯 Drag background to pan</li>
+            </ul>
+        </div>
+    </div>
+
+    <script>
+        // Color scheme for entity types
+        const colorMap = {
+            "person": "#ff6b6b",
+            "Person": "#ff6b6b",
+            "project": "#4ecdc4",
+            "Project": "#4ecdc4",
+            "technology": "#45b7d1",
+            "Technology": "#45b7d1",
+            "tool": "#96ceb4",
+            "Tool": "#96ceb4",
+            "organization": "#feca57",
+            "Organization": "#feca57",
+            "event": "#fd79a8",
+            "Event": "#fd79a8",
+            "concept": "#a29bfe",
+            "Concept": "#a29bfe",
+            "product": "#ff9ff3",
+            "Product": "#ff9ff3",
+            "book": "#54a0ff",
+            "Book": "#54a0ff",
+            "feature": "#48dbfb",
+            "research": "#00b894",
+            "default": "#95a5a6"
+        };
+
+        let simulation, svg, g, zoom, currentData;
+        const width = window.innerWidth;
+        const height = window.innerHeight;
+
+        // Demo data URL - using your GitHub raw content
+        const DEMO_DATA_URL = 'https://raw.githubusercontent.com/dzivkovi/mcp-memory-visualizer/main/memory.json';
+
+        // Initialize the app
+        function initializeApp() {
+            // Create SVG
+            svg = d3.select("#main-app")
+                .append("svg")
+                .attr("width", width)
+                .attr("height", height);
+
+            g = svg.append("g");
+
+            // Set up zoom
+            zoom = d3.zoom()
+                .scaleExtent([0.1, 10])
+                .on("zoom", (event) => {
+                    g.attr("transform", event.transform);
+                });
+
+            svg.call(zoom);
+
+            // Create arrow markers
+            svg.append("defs").append("marker")
+                .attr("id", "arrowhead")
+                .attr("viewBox", "-0 -5 10 10")
+                .attr("refX", 25)
+                .attr("refY", 0)
+                .attr("orient", "auto")
+                .attr("markerWidth", 8)
+                .attr("markerHeight", 8)
+                .attr("xoverflow", "visible")
+                .append("svg:path")
+                .attr("d", "M 0,-5 L 10 ,0 L 0,5")
+                .attr("fill", "#999")
+                .style("stroke", "none");
+        }
+
+        // Load demo data
+        async function loadDemoData() {
+            try {
+                const response = await fetch(DEMO_DATA_URL);
+                const text = await response.text();
+                const data = parseMemoryData(text);
+                visualizeData(data);
+                showApp();
+            } catch (error) {
+                console.error('Error loading demo data:', error);
+                showError('Could not load demo data. Please try uploading your own memory file.');
+            }
+        }
+
+        // Parse memory data (handles both JSON and JSONL formats)
+        function parseMemoryData(text) {
+            let entities = [];
+            let relations = [];
+
+            try {
+                // Try to parse as regular JSON first
+                const data = JSON.parse(text);
+                entities = data.entities || [];
+                relations = data.relations || [];
+            } catch (e) {
+                // If that fails, try JSONL format (one JSON object per line)
+                const lines = text.trim().split('\n');
+                lines.forEach(line => {
+                    if (line.trim()) {
+                        try {
+                            const obj = JSON.parse(line);
+                            if (obj.type === 'entity') {
+                                entities.push(obj);
+                            } else if (obj.type === 'relation') {
+                                relations.push(obj);
+                            }
+                        } catch (lineError) {
+                            console.warn('Skipping invalid line:', line);
+                        }
+                    }
+                });
+            }
+
+            return { entities, relations };
+        }
+
+        // Process data for D3
+        function processDataForD3(data) {
+            const nodes = data.entities.map(e => ({
+                id: e.name,
+                name: e.name,
+                type: e.entityType,
+                observations: e.observations || [],
+                observationCount: (e.observations || []).length
+            }));
+
+            const links = data.relations.map(r => ({
+                source: r.from,
+                target: r.to,
+                type: r.relationType
+            }));
+
+            return { nodes, links };
+        }
+
+        // Visualize the data
+        function visualizeData(data) {
+            currentData = processDataForD3(data);
+            
+            // Clear previous visualization
+            g.selectAll("*").remove();
+
+            // Update stats
+            document.getElementById('node-count').textContent = currentData.nodes.length;
+            document.getElementById('link-count').textContent = currentData.links.length;
+
+            // Create force simulation
+            simulation = d3.forceSimulation(currentData.nodes)
+                .force("link", d3.forceLink(currentData.links).id(d => d.id).distance(100))
+                .force("charge", d3.forceManyBody().strength(-500))
+                .force("center", d3.forceCenter(width / 2, height / 2))
+                .force("collision", d3.forceCollide().radius(d => Math.max(20, d.observationCount * 2 + 15)));
+
+            // Create links
+            const link = g.append("g")
+                .selectAll("line")
+                .data(currentData.links)
+                .enter().append("line")
+                .attr("class", "link")
+                .attr("marker-end", "url(#arrowhead)");
+
+            // Create nodes
+            const node = g.append("g")
+                .selectAll("circle")
+                .data(currentData.nodes)
+                .enter().append("circle")
+                .attr("class", "node")
+                .attr("r", d => Math.max(15, Math.min(30, d.observationCount * 2 + 10)))
+                .attr("fill", d => colorMap[d.type] || colorMap.default)
+                .call(d3.drag()
+                    .on("start", dragstarted)
+                    .on("drag", dragged)
+                    .on("end", dragended));
+
+            // Create labels
+            const label = g.append("g")
+                .selectAll("text")
+                .data(currentData.nodes)
+                .enter().append("text")
+                .attr("class", "node-label")
+                .text(d => d.name)
+                .attr("dy", d => -Math.max(20, Math.min(35, d.observationCount * 2 + 15)));
+
+            // Add tooltips
+            node.append("title")
+                .text(d => `${d.name}\n${d.type}\n${d.observationCount} observations`);
+
+            // Click handler
+            node.on("click", function(event, d) {
+                showDetails(d);
+                highlightNode(d);
+            });
+
+            // Update simulation
+            simulation.on("tick", () => {
+                link
+                    .attr("x1", d => d.source.x)
+                    .attr("y1", d => d.source.y)
+                    .attr("x2", d => d.target.x)
+                    .attr("y2", d => d.target.y);
+
+                node
+                    .attr("cx", d => d.x)
+                    .attr("cy", d => d.y);
+
+                label
+                    .attr("x", d => d.x)
+                    .attr("y", d => d.y);
+            });
+
+            // Update legend
+            updateLegend();
+
+            // Set up search
+            setupSearch(node, link);
+
+            // Fit to view after simulation settles
+            setTimeout(() => {
+                const bounds = g.node().getBBox();
+                const fullWidth = width - 100;
+                const fullHeight = height - 100;
+                const widthScale = fullWidth / bounds.width;
+                const heightScale = fullHeight / bounds.height;
+                const scale = 0.9 * Math.min(widthScale, heightScale);
+                const translate = [fullWidth / 2 - scale * (bounds.x + bounds.width / 2),
+                                 fullHeight / 2 - scale * (bounds.y + bounds.height / 2)];
+                
+                svg.call(zoom.transform, d3.zoomIdentity.translate(translate[0], translate[1]).scale(scale));
+            }, 2000);
+        }
+
+        // Drag functions
+        function dragstarted(event, d) {
+            if (!event.active) simulation.alphaTarget(0.3).restart();
+            d.fx = d.x;
+            d.fy = d.y;
+        }
+
+        function dragged(event, d) {
+            d.fx = event.x;
+            d.fy = event.y;
+        }
+
+        function dragended(event, d) {
+            if (!event.active) simulation.alphaTarget(0);
+            d.fx = null;
+            d.fy = null;
+        }
+
+        // Show details panel
+        function showDetails(nodeData) {
+            document.getElementById('details').style.display = 'block';
+            document.getElementById('entity-name').textContent = nodeData.name;
+            document.getElementById('entity-type').textContent = nodeData.type;
+            document.getElementById('obs-count').textContent = nodeData.observationCount;
+            
+            // Show observations
+            const obsContainer = document.getElementById('observations');
+            obsContainer.innerHTML = '';
+            nodeData.observations.forEach(obs => {
+                const div = document.createElement('div');
+                div.className = 'observation';
+                div.textContent = obs;
+                obsContainer.appendChild(div);
+            });
+            
+            // Show relations
+            const relContainer = document.getElementById('relations');
+            relContainer.innerHTML = '';
+            
+            currentData.links.forEach(link => {
+                if (link.source.id === nodeData.id || link.source === nodeData.id) {
+                    const div = document.createElement('div');
+                    div.className = 'relation';
+                    const targetName = typeof link.target === 'object' ? link.target.name : link.target;
+                    div.innerHTML = `<span class="relation-arrow">→</span> <strong>${link.type}</strong> → ${targetName}`;
+                    relContainer.appendChild(div);
+                }
+                if (link.target.id === nodeData.id || link.target === nodeData.id) {
+                    const div = document.createElement('div');
+                    div.className = 'relation';
+                    const sourceName = typeof link.source === 'object' ? link.source.name : link.source;
+                    div.innerHTML = `<span class="relation-arrow">←</span> <strong>${link.type}</strong> ← ${sourceName}`;
+                    relContainer.appendChild(div);
+                }
+            });
+        }
+
+        function closeDetails() {
+            document.getElementById('details').style.display = 'none';
+            g.selectAll('.node').classed('highlighted', false);
+            g.selectAll('.link').classed('highlighted', false);
+        }
+
+        function highlightNode(nodeData) {
+            g.selectAll('.node').classed('highlighted', d => d.id === nodeData.id);
+            g.selectAll('.link').classed('highlighted', d => 
+                (d.source.id === nodeData.id || d.target.id === nodeData.id) ||
+                (d.source === nodeData.id || d.target === nodeData.id)
+            );
+        }
+
+        // Update legend
+        function updateLegend() {
+            const types = [...new Set(currentData.nodes.map(n => n.type))].sort();
+            const legendContainer = document.getElementById('legend-items');
+            legendContainer.innerHTML = '';
+            
+            types.forEach(type => {
+                const item = document.createElement('div');
+                item.className = 'legend-item';
+                
+                const color = document.createElement('div');
+                color.className = 'legend-color';
+                color.style.backgroundColor = colorMap[type] || colorMap.default;
+                
+                const label = document.createElement('div');
+                label.textContent = type;
+                
+                item.appendChild(color);
+                item.appendChild(label);
+                legendContainer.appendChild(item);
+            });
+        }
+
+        // Set up search functionality
+        function setupSearch(nodeSelection, linkSelection) {
+            document.getElementById('search').addEventListener('input', function(e) {
+                const searchTerm = e.target.value.toLowerCase();
+                
+                if (searchTerm) {
+                    nodeSelection.classed('dimmed', d => {
+                        const inName = d.name.toLowerCase().includes(searchTerm);
+                        const inObs = d.observations.some(obs => 
+                            obs.toLowerCase().includes(searchTerm)
+                        );
+                        return !inName && !inObs;
+                    });
+                    
+                    linkSelection.classed('dimmed', d => {
+                        const sourceMatch = d.source.name.toLowerCase().includes(searchTerm);
+                        const targetMatch = d.target.name.toLowerCase().includes(searchTerm);
+                        return !sourceMatch && !targetMatch;
+                    });
+                } else {
+                    nodeSelection.classed('dimmed', false);
+                    linkSelection.classed('dimmed', false);
+                }
+            });
+        }
+
+        // File handling
+        function handleFileUpload(event) {
+            const file = event.target.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    try {
+                        const data = parseMemoryData(e.target.result);
+                        visualizeData(data);
+                        showApp();
+                        hideError();
+                    } catch (error) {
+                        showError('Invalid file format. Please upload a valid memory.json file.');
+                        console.error('Parse error:', error);
+                    }
+                };
+                reader.readAsText(file);
+            }
+        }
+
+        // Drag and drop handling
+        function handleDrop(event) {
+            event.preventDefault();
+            event.stopPropagation();
+            document.querySelector('.upload-area').classList.remove('dragover');
+            
+            const files = event.dataTransfer.files;
+            if (files.length > 0) {
+                const file = files[0];
+                if (file.name.endsWith('.json') || file.name.endsWith('.jsonl')) {
+                    const fakeEvent = { target: { files: [file] } };
+                    handleFileUpload(fakeEvent);
+                } else {
+                    showError('Please upload a .json or .jsonl file');
+                }
+            }
+        }
+
+        function handleDragOver(event) {
+            event.preventDefault();
+            event.stopPropagation();
+            document.querySelector('.upload-area').classList.add('dragover');
+        }
+
+        function handleDragLeave(event) {
+            event.preventDefault();
+            event.stopPropagation();
+            document.querySelector('.upload-area').classList.remove('dragover');
+        }
+
+        // UI helpers
+        function showApp() {
+            document.getElementById('welcome').classList.add('hidden');
+            document.getElementById('main-app').style.display = 'block';
+        }
+
+        function showError(message) {
+            const errorEl = document.getElementById('error-message');
+            errorEl.textContent = message;
+            errorEl.style.display = 'block';
+        }
+
+        function hideError() {
+            document.getElementById('error-message').style.display = 'none';
+        }
+
+        // Zoom controls
+        function resetView() {
+            svg.transition().duration(750).call(zoom.transform, d3.zoomIdentity);
+        }
+
+        function zoomIn() {
+            svg.transition().duration(300).call(zoom.scaleBy, 1.3);
+        }
+
+        function zoomOut() {
+            svg.transition().duration(300).call(zoom.scaleBy, 0.7);
+        }
+
+        // Initialize on load
+        document.addEventListener('DOMContentLoaded', initializeApp);
+    </script>
+</body>
+</html>
